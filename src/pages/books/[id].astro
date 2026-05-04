@@ -1,0 +1,244 @@
+---
+import { supabase } from "../../lib/supabase";
+import BaseLayout from "../../layouts/BaseLayout.astro";
+import type {
+  Book,
+  Analysis,
+  ReadingCost,
+  SimilarBook,
+  RawSource,
+} from "../../lib/database.types";
+
+const { id } = Astro.params;
+
+if (!id) {
+  return Astro.redirect("/books");
+}
+
+const { data: book, error: bookErr } = await supabase
+  .from("books")
+  .select("*")
+  .eq("id", id)
+  .single<Book>();
+
+if (bookErr || !book) {
+  return new Response("책을 찾을 수 없습니다.", { status: 404 });
+}
+
+const { data: analyses } = await supabase
+  .from("analyses")
+  .select("*")
+  .eq("book_id", id)
+  .order("generated_at", { ascending: false })
+  .limit(1)
+  .returns<Analysis[]>();
+
+const analysis = analyses?.[0];
+
+const similarBooks = (analysis?.similar_books ?? []) as SimilarBook[];
+const readingCost = analysis?.reading_cost as ReadingCost | null;
+const rawSources = (analysis?.raw_sources ?? []) as RawSource[];
+
+const sourceTypeLabel: Record<RawSource["type"], string> = {
+  naver_blog: "네이버 블로그",
+  aladin_review: "알라딘",
+  kyobo_review: "교보문고",
+  blog: "블로그",
+  other: "기타",
+};
+---
+
+<BaseLayout
+  title={`${book.title} — 책살피`}
+  description={book.description ?? undefined}
+>
+  <article class="space-y-10">
+    <header class="flex flex-col gap-6 sm:flex-row sm:items-start">
+      {
+        book.cover_url && (
+          <img
+            src={book.cover_url}
+            alt={`${book.title} 표지`}
+            class="h-56 w-40 flex-none rounded object-cover shadow"
+            loading="eager"
+          />
+        )
+      }
+      <div class="min-w-0 flex-1 space-y-2">
+        {
+          book.category && (
+            <span class="inline-block rounded bg-neutral-100 px-2 py-0.5 text-xs text-neutral-600">
+              {book.category}
+            </span>
+          )
+        }
+        <h1 class="text-3xl font-bold tracking-tight">{book.title}</h1>
+        {book.author && <p class="text-neutral-700">{book.author}</p>}
+        <dl
+          class="grid grid-cols-2 gap-x-4 gap-y-1 pt-2 text-sm text-neutral-600"
+        >
+          {
+            book.publisher && (
+              <>
+                <dt class="text-neutral-500">출판사</dt>
+                <dd>{book.publisher}</dd>
+              </>
+            )
+          }
+          {
+            book.published_date && (
+              <>
+                <dt class="text-neutral-500">출간일</dt>
+                <dd>{book.published_date}</dd>
+              </>
+            )
+          }
+          {
+            book.isbn && (
+              <>
+                <dt class="text-neutral-500">ISBN</dt>
+                <dd class="font-mono text-xs">{book.isbn}</dd>
+              </>
+            )
+          }
+        </dl>
+        {
+          book.source_url && (
+            <p class="pt-2 text-sm">
+              <a
+                href={book.source_url}
+                class="text-blue-600 hover:underline"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                원본 페이지 →
+              </a>
+            </p>
+          )
+        }
+      </div>
+    </header>
+
+    {
+      book.description && (
+        <section class="rounded-lg border border-neutral-200 bg-white p-5">
+          <h2 class="mb-2 text-sm font-medium text-neutral-500">책 소개</h2>
+          <p class="leading-relaxed whitespace-pre-line text-neutral-800">
+            {book.description}
+          </p>
+        </section>
+      )
+    }
+
+    {
+      analysis ? (
+        <div class="space-y-8">
+          <div class="border-t border-neutral-200 pt-6 text-sm text-neutral-500">
+            <span class="font-medium text-neutral-700">분석</span>
+            {" · "}생성{" "}
+            {new Date(analysis.generated_at).toLocaleDateString("ko-KR")}
+            {" · 모델 "}
+            {analysis.model_version} ({analysis.prompt_version})
+          </div>
+
+          <section>
+            <h2 class="text-lg font-semibold">누구에게 좋은가</h2>
+            <p class="mt-3 leading-relaxed whitespace-pre-line text-neutral-800">
+              {analysis.target_reader ?? "정보 부족"}
+            </p>
+          </section>
+
+          <section>
+            <h2 class="text-lg font-semibold">비슷한 책과의 차이</h2>
+            {similarBooks.length > 0 ? (
+              <ul class="mt-3 space-y-3">
+                {similarBooks.map((sb) => (
+                  <li class="rounded-lg border border-neutral-200 bg-white p-4">
+                    <div class="font-medium">{sb.title}</div>
+                    {sb.author && (
+                      <div class="text-sm text-neutral-600">{sb.author}</div>
+                    )}
+                    <p class="mt-2 text-sm leading-relaxed text-neutral-800">
+                      {sb.diff}
+                    </p>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p class="mt-3 text-neutral-500">정보 부족</p>
+            )}
+          </section>
+
+          <section>
+            <h2 class="text-lg font-semibold">약점/한계</h2>
+            <p class="mt-3 leading-relaxed whitespace-pre-line text-neutral-800">
+              {analysis.weaknesses ?? "정보 부족"}
+            </p>
+          </section>
+
+          <section>
+            <h2 class="text-lg font-semibold">읽는 비용</h2>
+            {readingCost ? (
+              <dl class="mt-3 grid grid-cols-2 gap-x-4 gap-y-2 sm:grid-cols-4">
+                <div>
+                  <dt class="text-sm text-neutral-500">분량</dt>
+                  <dd class="font-medium">
+                    {readingCost.pages != null ? `${readingCost.pages}쪽` : "—"}
+                  </dd>
+                </div>
+                <div>
+                  <dt class="text-sm text-neutral-500">난이도</dt>
+                  <dd class="font-medium">{readingCost.difficulty ?? "—"}</dd>
+                </div>
+                <div>
+                  <dt class="text-sm text-neutral-500">예상 시간</dt>
+                  <dd class="font-medium">
+                    {readingCost.est_hours != null
+                      ? `${readingCost.est_hours}시간`
+                      : "—"}
+                  </dd>
+                </div>
+                <div class="col-span-2 sm:col-span-1">
+                  <dt class="text-sm text-neutral-500">번역</dt>
+                  <dd class="text-sm">{readingCost.translation ?? "—"}</dd>
+                </div>
+              </dl>
+            ) : (
+              <p class="mt-3 text-neutral-500">정보 부족</p>
+            )}
+          </section>
+
+          {rawSources.length > 0 && (
+            <section>
+              <h2 class="text-lg font-semibold">출처 ({rawSources.length})</h2>
+              <ul class="mt-3 space-y-2 text-sm">
+                {rawSources.map((src) => (
+                  <li class="rounded border border-neutral-200 bg-white p-3">
+                    <div class="flex items-center gap-2">
+                      <span class="rounded bg-neutral-100 px-1.5 py-0.5 text-xs text-neutral-600">
+                        {sourceTypeLabel[src.type] ?? src.type}
+                      </span>
+                      <a
+                        href={src.url}
+                        class="truncate text-blue-600 hover:underline"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                      >
+                        {src.url}
+                      </a>
+                    </div>
+                    <p class="mt-1 leading-relaxed text-neutral-700">
+                      {src.summary}
+                    </p>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
+        </div>
+      ) : (
+        <p class="text-neutral-500">분석 데이터가 없습니다.</p>
+      )
+    }
+  </article>
+</BaseLayout>

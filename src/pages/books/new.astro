@@ -1,0 +1,119 @@
+---
+import BaseLayout from "../../layouts/BaseLayout.astro";
+
+export const prerender = true;
+---
+
+<BaseLayout title="책 등록 — 책살피">
+  <section class="space-y-6">
+    <header>
+      <h1 class="text-2xl font-bold tracking-tight">책 등록</h1>
+      <p class="mt-1 text-sm text-neutral-600">
+        알라딘/교보 URL 또는 13자리 ISBN을 붙여넣으면 메타데이터를 자동으로
+        수집합니다. 등록 후 다음 새벽 분석 워커가 4관점 분석을 생성합니다.
+      </p>
+    </header>
+
+    <form
+      method="POST"
+      action="/api/books/create"
+      class="space-y-4 rounded-lg border border-neutral-200 bg-white p-5"
+      id="book-form"
+    >
+      <div>
+        <label for="input" class="block text-sm font-medium text-neutral-700">
+          URL 또는 ISBN
+        </label>
+        <input
+          type="text"
+          id="input"
+          name="input"
+          required
+          placeholder="https://product.kyobobook.co.kr/detail/S0000... 또는 9788966262472"
+          class="mt-1 block w-full rounded border border-neutral-300 px-3 py-2 text-sm focus:border-neutral-500 focus:outline-none"
+        />
+        <p class="mt-1 text-xs text-neutral-500">
+          교보문고 상품 URL · 알라딘 상품 URL · 13자리 ISBN(숫자만) 지원
+        </p>
+      </div>
+
+      <div>
+        <label
+          for="category"
+          class="block text-sm font-medium text-neutral-700"
+        >
+          분야 (선택)
+        </label>
+        <input
+          type="text"
+          id="category"
+          name="category"
+          placeholder="투자, 비즈니스, 기술, 인문 등"
+          class="mt-1 block w-full rounded border border-neutral-300 px-3 py-2 text-sm focus:border-neutral-500 focus:outline-none"
+        />
+      </div>
+
+      <div class="flex items-center gap-3">
+        <button
+          type="submit"
+          id="submit-btn"
+          class="rounded bg-neutral-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-neutral-700 disabled:cursor-not-allowed disabled:bg-neutral-400"
+        >
+          등록
+        </button>
+        <span id="submit-status" class="hidden text-sm text-neutral-600">
+          메타데이터 수집 중… 5~15초 정도 걸려요.
+        </span>
+      </div>
+
+      <div
+        id="error-box"
+        class="hidden rounded border border-red-200 bg-red-50 p-3 text-sm text-red-700"
+      >
+      </div>
+    </form>
+  </section>
+</BaseLayout>
+
+<script>
+  const form = document.getElementById("book-form") as HTMLFormElement;
+  const btn = document.getElementById("submit-btn") as HTMLButtonElement;
+  const status = document.getElementById("submit-status") as HTMLSpanElement;
+  const errorBox = document.getElementById("error-box") as HTMLDivElement;
+
+  form?.addEventListener("submit", () => {
+    btn.disabled = true;
+    status.classList.remove("hidden");
+    errorBox.classList.add("hidden");
+  });
+
+  // 서버가 redirect 대신 JSON 에러 응답한 경우(브라우저는 자동 follow하지 않으니 수동 fetch가 더 깔끔)
+  form?.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const fd = new FormData(form);
+    try {
+      const res = await fetch(form.action, { method: "POST", body: fd });
+      if (res.redirected) {
+        window.location.href = res.url;
+        return;
+      }
+      if (res.ok) {
+        // shouldn't happen — server endpoint always redirects on success
+        window.location.reload();
+        return;
+      }
+      const data = (await res.json().catch(() => null)) as {
+        error?: string;
+      } | null;
+      errorBox.textContent = data?.error ?? `요청 실패 (${res.status})`;
+      errorBox.classList.remove("hidden");
+    } catch (err) {
+      errorBox.textContent =
+        err instanceof Error ? err.message : "네트워크 오류";
+      errorBox.classList.remove("hidden");
+    } finally {
+      btn.disabled = false;
+      status.classList.add("hidden");
+    }
+  });
+</script>

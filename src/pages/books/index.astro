@@ -1,0 +1,72 @@
+---
+import { supabase } from "../../lib/supabase";
+import BaseLayout from "../../layouts/BaseLayout.astro";
+import type { Book } from "../../lib/database.types";
+
+type BookSummary = Pick<
+  Book,
+  "id" | "title" | "author" | "category" | "cover_url" | "status" | "updated_at"
+>;
+
+const { data: books, error } = await supabase
+  .from("books")
+  .select("id, title, author, category, cover_url, status, updated_at")
+  .eq("status", "done")
+  .order("updated_at", { ascending: false })
+  .limit(50)
+  .returns<BookSummary[]>();
+
+if (error) {
+  throw new Error(`books fetch failed: ${error.message}`);
+}
+---
+
+<BaseLayout title="책 목록 — 책살피">
+  <section class="space-y-6">
+    <header>
+      <h1 class="text-2xl font-bold tracking-tight">분석 완료된 책</h1>
+      <p class="mt-1 text-sm text-neutral-600">
+        {books?.length ?? 0}권. 최신 분석 순.
+      </p>
+    </header>
+
+    {
+      books && books.length > 0 ? (
+        <ul class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          {books.map((book) => (
+            <li>
+              <a
+                href={`/books/${book.id}`}
+                class="flex gap-4 rounded-lg border border-neutral-200 bg-white p-4 transition hover:border-neutral-400 hover:shadow-sm"
+              >
+                {book.cover_url && (
+                  <img
+                    src={book.cover_url}
+                    alt={`${book.title} 표지`}
+                    class="h-32 w-24 flex-none rounded object-cover"
+                    loading="lazy"
+                  />
+                )}
+                <div class="min-w-0 flex-1">
+                  {book.category && (
+                    <span class="inline-block rounded bg-neutral-100 px-2 py-0.5 text-xs text-neutral-600">
+                      {book.category}
+                    </span>
+                  )}
+                  <h2 class="mt-1 truncate font-medium">{book.title}</h2>
+                  {book.author && (
+                    <p class="truncate text-sm text-neutral-600">
+                      {book.author}
+                    </p>
+                  )}
+                </div>
+              </a>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p class="text-sm text-neutral-500">아직 분석된 책이 없습니다.</p>
+      )
+    }
+  </section>
+</BaseLayout>

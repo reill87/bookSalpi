@@ -36,7 +36,11 @@ export interface RawSource {
   summary: string;
 }
 
-export interface Database {
+export type Book = Database["chaeksalpi"]["Tables"]["books"]["Row"];
+export type Analysis = Database["chaeksalpi"]["Tables"]["analyses"]["Row"];
+export type UserPick = Database["chaeksalpi"]["Tables"]["user_picks"]["Row"];
+
+export type Database = {
   chaeksalpi: {
     Tables: {
       books: {
@@ -146,8 +150,9 @@ export interface Database {
         >;
       };
     };
-    Views: Record<string, never>;
-    Functions: Record<string, never>;
-    Enums: Record<string, never>;
+    Views: { [_ in never]: never };
+    Functions: { [_ in never]: never };
+    Enums: { [_ in never]: never };
+    CompositeTypes: { [_ in never]: never };
   };
-}
+};
