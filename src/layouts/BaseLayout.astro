@@ -4,12 +4,23 @@ import "../styles/global.css";
 interface Props {
   title?: string;
   description?: string;
+  ogImage?: string;
+  ogType?: "website" | "article";
 }
 
 const {
   title = "책살피",
   description = "AI가 다각도로 분석한 도서 큐레이션 & 평가",
+  ogImage,
+  ogType = "website",
 } = Astro.props;
+
+const user = Astro.locals.user;
+const siteUrl = import.meta.env.PUBLIC_SITE_URL ?? Astro.url.origin;
+const canonicalUrl = new URL(Astro.url.pathname, siteUrl).href;
+const resolvedOgImage = ogImage
+  ? new URL(ogImage, siteUrl).href
+  : new URL("/og-default.svg", siteUrl).href;
 ---
 
 <!doctype html>
@@ -18,21 +29,61 @@ const {
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="description" content={description} />
+    <link rel="canonical" href={canonicalUrl} />
     <title>{title}</title>
+
+    <meta property="og:title" content={title} />
+    <meta property="og:description" content={description} />
+    <meta property="og:type" content={ogType} />
+    <meta property="og:url" content={canonicalUrl} />
+    <meta property="og:image" content={resolvedOgImage} />
+    <meta property="og:site_name" content="책살피" />
+    <meta property="og:locale" content="ko_KR" />
+
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content={title} />
+    <meta name="twitter:description" content={description} />
+    <meta name="twitter:image" content={resolvedOgImage} />
+
+    <meta name="theme-color" content="#171717" />
   </head>
   <body class="min-h-screen bg-neutral-50 text-neutral-900 antialiased">
     <header class="border-b border-neutral-200 bg-white">
       <div
-        class="mx-auto flex max-w-3xl items-center justify-between px-4 py-4"
+        class="mx-auto flex max-w-3xl flex-wrap items-center justify-between gap-y-2 px-4 py-4"
       >
         <a href="/" class="text-lg font-semibold tracking-tight">책살피</a>
-        <nav class="flex gap-4 text-sm text-neutral-600">
+        <nav
+          class="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-neutral-600"
+        >
           <a href="/books" class="hover:text-neutral-900">책 목록</a>
           <a href="/books/new" class="hover:text-neutral-900">책 등록</a>
+          {
+            user ? (
+              <>
+                <a href="/me/library" class="hover:text-neutral-900">
+                  내 책장
+                </a>
+                <form method="POST" action="/api/auth/logout" class="inline">
+                  <button
+                    type="submit"
+                    class="text-neutral-500 hover:text-neutral-900"
+                    title={user.email ?? undefined}
+                  >
+                    로그아웃
+                  </button>
+                </form>
+              </>
+            ) : (
+              <a href="/login" class="hover:text-neutral-900">
+                로그인
+              </a>
+            )
+          }
         </nav>
       </div>
     </header>
-    <main class="mx-auto max-w-3xl px-4 py-8">
+    <main class="mx-auto max-w-3xl px-4 py-6 sm:py-8">
       <slot />
     </main>
   </body>

@@ -90,6 +90,37 @@ pnpm build     # production build
 
 `scripts/chaeksalpi-analyze.md`를 Claude Code에서 열어 그대로 따라하거나, Claude scheduled에 등록해 매일 새벽 자동 실행. 자세한 절차는 해당 파일 참고.
 
+## 배포
+
+`astro.config.mjs`는 환경변수 `VERCEL`로 어댑터를 자동 분기합니다.
+
+- 로컬/Docker/셀프호스팅: `@astrojs/node` (standalone, `dist/server/entry.mjs`)
+- Vercel: `@astrojs/vercel` (Vercel이 빌드 시 `VERCEL=1` 자동 주입)
+
+### Vercel 배포 단계
+
+1. **프로젝트 생성**: Vercel 대시보드 → New Project → 이 GitHub 저장소 import
+2. **Build & Output Settings**:
+   - Framework Preset: Astro
+   - Build Command: `pnpm build`
+   - Output Directory: 비워두기 (어댑터가 처리)
+3. **환경 변수**: `.env.example`의 모든 키를 Vercel Project Settings → Environment Variables에 동일하게 설정. 특히 `PUBLIC_SITE_URL`은 실제 배포 도메인으로 변경.
+4. **Supabase Auth Redirect URLs**: Supabase Dashboard → Authentication → URL Configuration에 배포 도메인 추가 (`https://<your-domain>/api/auth/callback`).
+5. **Deploy** → 첫 빌드 후 동작 확인.
+
+### 셀프호스팅 (Docker / VM)
+
+```bash
+pnpm build
+node dist/server/entry.mjs   # 기본 4321 포트
+```
+
+PM2/systemd로 데몬 관리. 환경변수는 `.env`로.
+
+### 분석 워커와의 연결
+
+분석 워커는 Claude Code 로컬 환경에서 cron으로 실행되며, 같은 Supabase 프로젝트(`chaeksalpi` 스키마)에 결과를 INSERT합니다. 즉 웹 앱 배포와 워커 인프라는 **분리**되어 있습니다 — 웹은 Vercel/셀프호스팅, 워커는 본인 머신의 Claude scheduled.
+
 ## 마일스톤 (PRD §8 요약)
 
 - **Week 1**: 분석 파이프라인 검증 (UI 없이, 책 2~3권 수동 분석)

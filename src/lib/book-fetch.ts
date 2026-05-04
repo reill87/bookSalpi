@@ -49,7 +49,9 @@ function extractKyoboMeta(
 ): Partial<BookMetadata> {
   const meta: Partial<BookMetadata> = { source_url: sourceUrl };
 
-  const titleMatch = md.match(/Title:\s*([^|]+?)\s*\|\s*([^-]+?)\s*-\s*교보문고/);
+  const titleMatch = md.match(
+    /Title:\s*([^|]+?)\s*\|\s*([^-]+?)\s*-\s*교보문고/,
+  );
   if (titleMatch) {
     meta.title = titleMatch[1].trim();
     meta.author = titleMatch[2].trim();

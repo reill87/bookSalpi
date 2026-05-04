@@ -1,5 +1,4 @@
 import type { APIRoute } from "astro";
-import { createServiceRoleClient } from "../../../lib/supabase";
 import {
   parseInput,
   fetchBookMetadata,
@@ -8,7 +7,15 @@ import {
 
 export const prerender = false;
 
-export const POST: APIRoute = async ({ request, redirect }) => {
+export const POST: APIRoute = async ({ request, redirect, locals }) => {
+  // /books/new가 미들웨어 보호 라우트라 user는 사실상 항상 존재.
+  // 직접 API 호출 케이스만 명시적 가드.
+  if (!locals.user) {
+    return new Response(JSON.stringify({ error: "로그인이 필요합니다." }), {
+      status: 401,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
   const form = await request.formData();
   const inputRaw = String(form.get("input") ?? "").trim();
   const category = String(form.get("category") ?? "").trim() || null;
@@ -45,7 +52,7 @@ export const POST: APIRoute = async ({ request, redirect }) => {
     );
   }
 
-  const supabase = createServiceRoleClient();
+  const supabase = locals.supabase;
 
   // ISBN 중복 시 기존 행으로 redirect
   if (metadata.isbn) {
@@ -65,6 +72,7 @@ export const POST: APIRoute = async ({ request, redirect }) => {
       ...metadata,
       category,
       status: "pending",
+      added_by: locals.user.id,
     } as never)
     .select("id")
     .single<{ id: string }>();

@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#fafafa"/>
+      <stop offset="100%" stop-color="#e5e5e5"/>
+    </linearGradient>
+  </defs>
+  <rect width="1200" height="630" fill="url(#bg)"/>
+  <g font-family="-apple-system, BlinkMacSystemFont, 'Apple SD Gothic Neo', sans-serif">
+    <text x="80" y="240" font-size="96" font-weight="700" fill="#171717">책살피</text>
+    <text x="80" y="320" font-size="36" font-weight="400" fill="#525252">AI가 4가지 관점으로 정리한</text>
+    <text x="80" y="370" font-size="36" font-weight="400" fill="#525252">도서 큐레이션 &amp; 평가</text>
+    <g transform="translate(80, 460)" fill="#404040" font-size="24">
+      <circle cx="10" cy="0" r="6" fill="#171717"/>
+      <text x="32" y="8">누구에게 좋은가</text>
+      <circle cx="10" cy="48" r="6" fill="#171717"/>
+      <text x="32" y="56">비슷한 책과의 차이</text>
+      <circle cx="10" cy="96" r="6" fill="#171717"/>
+      <text x="32" y="104">약점/한계</text>
+      <circle cx="10" cy="144" r="6" fill="#171717"/>
+      <text x="32" y="152">읽는 비용</text>
+    </g>
+  </g>
+</svg>
