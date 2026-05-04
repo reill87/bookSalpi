@@ -8,8 +8,9 @@
 
 ## 사전 조건
 
-- Supabase MCP가 설정되어 있어야 합니다.
-  - 프로젝트 ID: `<TODO: 실제 Supabase 프로젝트 ID>`
+- Supabase MCP (`https://mcp.supabase.com/mcp`)가 설정되어 있어야 합니다.
+  - stockontext와 같은 프로젝트를 공유하므로, MCP에서 동일한 프로젝트를 선택합니다.
+  - 모든 책살피 테이블은 `chaeksalpi` schema 아래에 있습니다.
 - 사용 가능한 스킬:
   - `insane-search` — 네이버 블로그/SNS 검색용
   - `deep-research` — 다각도 자료 수집용
@@ -20,7 +21,7 @@
 Supabase MCP로 다음 SQL 실행:
 ```sql
 select id, title, author, isbn, publisher, source_url, category, description
-from books
+from chaeksalpi.books
 where status = 'pending'
 order by created_at asc
 limit 5;
@@ -30,8 +31,8 @@ limit 5;
 
 ### 2. 책 상태 업데이트 (analyzing)
 ```sql
-update books set status = 'analyzing' where id = :book_id;
-insert into analysis_jobs (book_id) values (:book_id) returning id;
+update chaeksalpi.books set status = 'analyzing' where id = :book_id;
+insert into chaeksalpi.analysis_jobs (book_id) values (:book_id) returning id;
 ```
 반환된 `analysis_jobs.id`를 기억.
 
@@ -102,7 +103,7 @@ insert into analysis_jobs (book_id) values (:book_id) returning id;
 ### 5. 결과 저장
 
 ```sql
-insert into analyses (
+insert into chaeksalpi.analyses (
   book_id,
   target_reader,
   similar_books,
@@ -122,9 +123,9 @@ insert into analyses (
   'v1'
 );
 
-update books set status = 'done' where id = :book_id;
+update chaeksalpi.books set status = 'done' where id = :book_id;
 
-update analysis_jobs
+update chaeksalpi.analysis_jobs
 set finished_at = now(), status = 'success'
 where id = :job_id;
 ```
@@ -134,9 +135,9 @@ where id = :job_id;
 분석 도중 예외(자료 0건, JSON 파싱 실패, 네트워크 오류 등)가 발생하면:
 
 ```sql
-update books set status = 'failed' where id = :book_id;
+update chaeksalpi.books set status = 'failed' where id = :book_id;
 
-update analysis_jobs
+update chaeksalpi.analysis_jobs
 set finished_at = now(), status = 'failed', error_log = :error_text
 where id = :job_id;
 ```

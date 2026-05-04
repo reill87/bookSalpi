@@ -1,6 +1,9 @@
 // Hand-written placeholder for Supabase generated types.
-// Replace with `supabase gen types typescript --project-id <id>` output once a
-// Supabase project exists. Mirrors supabase/migrations/0001_init.sql.
+// Replace with `supabase gen types typescript --project-id <id> --schema chaeksalpi`
+// once the schema is applied. Mirrors supabase/migrations/0001_init.sql.
+//
+// 모든 책살피 테이블은 `chaeksalpi` schema 아래에 있으므로 Database 타입의 키도
+// `chaeksalpi`로 노출합니다. createClient<Database, 'chaeksalpi'>로 사용.
 
 export type Json =
   | string
@@ -34,7 +37,7 @@ export interface RawSource {
 }
 
 export interface Database {
-  public: {
+  chaeksalpi: {
     Tables: {
       books: {
         Row: {
@@ -71,7 +74,7 @@ export interface Database {
           created_at?: string;
           updated_at?: string;
         };
-        Update: Partial<Database["public"]["Tables"]["books"]["Insert"]>;
+        Update: Partial<Database["chaeksalpi"]["Tables"]["books"]["Insert"]>;
       };
       analyses: {
         Row: {
@@ -98,7 +101,7 @@ export interface Database {
           prompt_version: string;
           generated_at?: string;
         };
-        Update: Partial<Database["public"]["Tables"]["analyses"]["Insert"]>;
+        Update: Partial<Database["chaeksalpi"]["Tables"]["analyses"]["Insert"]>;
       };
       user_picks: {
         Row: {
@@ -117,7 +120,9 @@ export interface Database {
           added_at?: string;
           updated_at?: string;
         };
-        Update: Partial<Database["public"]["Tables"]["user_picks"]["Insert"]>;
+        Update: Partial<
+          Database["chaeksalpi"]["Tables"]["user_picks"]["Insert"]
+        >;
       };
       analysis_jobs: {
         Row: {
@@ -137,7 +142,7 @@ export interface Database {
           error_log?: string | null;
         };
         Update: Partial<
-          Database["public"]["Tables"]["analysis_jobs"]["Insert"]
+          Database["chaeksalpi"]["Tables"]["analysis_jobs"]["Insert"]
         >;
       };
     };

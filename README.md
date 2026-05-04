@@ -26,15 +26,23 @@ AI 기반 도서 큐레이션 & 평가 서비스.
 │   ├── layouts/BaseLayout.astro
 │   ├── lib/
 │   │   ├── database.types.ts       # Supabase 스키마 타입 (수기, 후에 자동 생성으로 교체)
-│   │   └── supabase.ts             # Supabase 클라이언트
+│   │   └── supabase.ts             # 브라우저용 + service-role 클라이언트
 │   ├── pages/index.astro
 │   └── styles/global.css
 ├── supabase/
-│   └── migrations/0001_init.sql    # 초기 스키마 + RLS
+│   └── migrations/0001_init.sql    # 'chaeksalpi' schema + 초기 테이블 + RLS
+├── .mcp.json                       # Supabase MCP 등록 (stockontext와 동일 패턴)
 ├── astro.config.mjs
 ├── package.json
 └── tsconfig.json
 ```
+
+## Supabase 구성
+
+`stockontext`와 **동일한 Supabase 프로젝트**를 공유합니다. 테이블 이름 충돌(특히 `analyses`)을 피하기 위해 책살피 테이블은 모두 `chaeksalpi` schema 아래에 둡니다.
+
+- MCP: `.mcp.json`에 `https://mcp.supabase.com/mcp` 등록 (stockontext와 동일 패턴)
+- 클라이언트: `createClient<Database, "chaeksalpi">(url, key, { db: { schema: "chaeksalpi" } })`로 기본 schema 고정
 
 ## 시작하기
 
@@ -52,17 +60,17 @@ pnpm install
 cp .env.example .env
 ```
 
-Supabase 프로젝트 만든 후 Settings → API에서 값을 복사해 채웁니다.
+`stockontext/.env.local`의 Supabase URL / anon key / service role key를 동일하게 채웁니다 (key 이름은 `PUBLIC_SUPABASE_*` / `SUPABASE_SERVICE_ROLE_KEY`로 변환).
 
 ### 3. DB 스키마 적용
 
-Supabase Studio의 SQL Editor 또는 CLI로:
-
 ```bash
-# 옵션 A: SQL Editor에 supabase/migrations/0001_init.sql 내용 붙여넣고 실행
+# 옵션 A: Supabase Studio SQL Editor에 supabase/migrations/0001_init.sql 붙여넣고 실행
 # 옵션 B: supabase CLI
 supabase db push
 ```
+
+적용 후 **Project Settings → API → "Exposed schemas"**에 `chaeksalpi`를 추가해야 PostgREST/JS 클라이언트가 접근할 수 있습니다.
 
 ### 4. 개발 서버
 
