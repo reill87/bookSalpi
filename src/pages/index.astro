@@ -1,0 +1,37 @@
+---
+import BaseLayout from "../layouts/BaseLayout.astro";
+---
+
+<BaseLayout>
+  <section class="space-y-6">
+    <div>
+      <h1 class="text-3xl font-bold tracking-tight">책살피</h1>
+      <p class="mt-2 text-neutral-600">
+        살까 말까 망설일 때, 4가지 관점으로 분석한 책 정보를 제공합니다.
+      </p>
+    </div>
+
+    <ul class="grid gap-3 text-sm">
+      <li class="rounded-md border border-neutral-200 bg-white p-4">
+        <div class="font-medium">누구에게 좋은가</div>
+        <div class="text-neutral-600">권장 독자, 단계, 관심사</div>
+      </li>
+      <li class="rounded-md border border-neutral-200 bg-white p-4">
+        <div class="font-medium">비슷한 책과의 차이</div>
+        <div class="text-neutral-600">유사 도서와의 구체적 비교</div>
+      </li>
+      <li class="rounded-md border border-neutral-200 bg-white p-4">
+        <div class="font-medium">약점/한계</div>
+        <div class="text-neutral-600">리뷰에서 자주 언급되는 아쉬운 점</div>
+      </li>
+      <li class="rounded-md border border-neutral-200 bg-white p-4">
+        <div class="font-medium">읽는 비용</div>
+        <div class="text-neutral-600">분량, 난이도, 번역 품질, 예상 시간</div>
+      </li>
+    </ul>
+
+    <p class="text-sm text-neutral-500">
+      MVP 셋업 단계. 기능은 PRD에 따라 순차적으로 추가됩니다.
+    </p>
+  </section>
+</BaseLayout>

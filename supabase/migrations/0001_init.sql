@@ -1,0 +1,143 @@
+-- 책살피 초기 스키마
+-- PRD §6 참고. RLS 정책은 마지막 블록에서 enable.
+
+-- ===========================
+-- Tables
+-- ===========================
+
+create table if not exists books (
+  id uuid primary key default gen_random_uuid(),
+  isbn text unique,
+  title text not null,
+  author text,
+  publisher text,
+  published_date date,
+  cover_url text,
+  description text,
+  toc text,
+  source_url text,
+  category text,
+  status text not null default 'pending'
+    check (status in ('pending', 'analyzing', 'done', 'failed')),
+  added_by uuid references auth.users(id) on delete set null,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create index if not exists books_status_idx on books(status);
+create index if not exists books_created_at_idx on books(created_at desc);
+
+create table if not exists analyses (
+  id uuid primary key default gen_random_uuid(),
+  book_id uuid not null references books(id) on delete cascade,
+  target_reader text,
+  similar_books jsonb,
+  weaknesses text,
+  reading_cost jsonb,
+  raw_sources jsonb,
+  model_version text not null,
+  prompt_version text not null,
+  generated_at timestamptz not null default now(),
+  unique (book_id, model_version, prompt_version)
+);
+
+create index if not exists analyses_book_id_idx on analyses(book_id);
+
+create table if not exists user_picks (
+  user_id uuid not null references auth.users(id) on delete cascade,
+  book_id uuid not null references books(id) on delete cascade,
+  status text not null check (status in ('wishlist', 'reading', 'read')),
+  personal_note text,
+  added_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  primary key (user_id, book_id)
+);
+
+create table if not exists analysis_jobs (
+  id uuid primary key default gen_random_uuid(),
+  book_id uuid not null references books(id) on delete cascade,
+  started_at timestamptz not null default now(),
+  finished_at timestamptz,
+  status text check (status in ('success', 'failed')),
+  error_log text
+);
+
+create index if not exists analysis_jobs_book_id_idx on analysis_jobs(book_id);
+
+-- ===========================
+-- Trigger: keep updated_at fresh
+-- ===========================
+
+create or replace function set_updated_at()
+returns trigger
+language plpgsql
+as $$
+begin
+  new.updated_at = now();
+  return new;
+end;
+$$;
+
+drop trigger if exists books_set_updated_at on books;
+create trigger books_set_updated_at
+  before update on books
+  for each row execute function set_updated_at();
+
+drop trigger if exists user_picks_set_updated_at on user_picks;
+create trigger user_picks_set_updated_at
+  before update on user_picks
+  for each row execute function set_updated_at();
+
+-- ===========================
+-- RLS
+-- ===========================
+
+alter table books enable row level security;
+alter table analyses enable row level security;
+alter table user_picks enable row level security;
+alter table analysis_jobs enable row level security;
+
+-- books: 누구나 read, 로그인 사용자만 insert, 등록자만 update.
+drop policy if exists books_read_all on books;
+create policy books_read_all on books
+  for select using (true);
+
+drop policy if exists books_insert_authenticated on books;
+create policy books_insert_authenticated on books
+  for insert to authenticated
+  with check (added_by = auth.uid());
+
+drop policy if exists books_update_owner on books;
+create policy books_update_owner on books
+  for update to authenticated
+  using (added_by = auth.uid())
+  with check (added_by = auth.uid());
+
+-- analyses: 누구나 read. write 는 service_role 전용 (RLS bypass).
+drop policy if exists analyses_read_all on analyses;
+create policy analyses_read_all on analyses
+  for select using (true);
+
+-- user_picks: 본인만 read/write.
+drop policy if exists user_picks_self_select on user_picks;
+create policy user_picks_self_select on user_picks
+  for select to authenticated
+  using (user_id = auth.uid());
+
+drop policy if exists user_picks_self_modify on user_picks;
+create policy user_picks_self_modify on user_picks
+  for all to authenticated
+  using (user_id = auth.uid())
+  with check (user_id = auth.uid());
+
+-- analysis_jobs: 본인이 등록한 책의 작업 로그만 read. write 는 service_role.
+drop policy if exists analysis_jobs_read_owner on analysis_jobs;
+create policy analysis_jobs_read_owner on analysis_jobs
+  for select to authenticated
+  using (
+    exists (
+      select 1 from books b
+      where b.id = analysis_jobs.book_id
+        and b.added_by = auth.uid()
+    )
+  );
