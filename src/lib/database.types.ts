@@ -36,6 +36,12 @@ export interface RawSource {
   summary: string;
 }
 
+export interface ChapterNote {
+  read: boolean;
+  note?: string;
+  rating?: 1 | 2 | 3 | 4 | 5;
+}
+
 export type Book = Database["chaeksalpi"]["Tables"]["books"]["Row"];
 export type Analysis = Database["chaeksalpi"]["Tables"]["analyses"]["Row"];
 export type UserPick = Database["chaeksalpi"]["Tables"]["user_picks"]["Row"];
@@ -58,6 +64,7 @@ export type Database = {
           category: string | null;
           status: BookStatus;
           added_by: string | null;
+          added_context: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -75,6 +82,7 @@ export type Database = {
           category?: string | null;
           status?: BookStatus;
           added_by?: string | null;
+          added_context?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -113,6 +121,9 @@ export type Database = {
           book_id: string;
           status: PickStatus;
           personal_note: string | null;
+          note_before: string | null;
+          note_after: string | null;
+          chapter_notes: Record<string, ChapterNote>;
           added_at: string;
           updated_at: string;
         };
@@ -121,6 +132,9 @@ export type Database = {
           book_id: string;
           status: PickStatus;
           personal_note?: string | null;
+          note_before?: string | null;
+          note_after?: string | null;
+          chapter_notes?: Record<string, ChapterNote>;
           added_at?: string;
           updated_at?: string;
         };

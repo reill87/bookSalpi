@@ -9,6 +9,14 @@ import type {
   RawSource,
   PickStatus,
 } from "../../lib/database.types";
+import {
+  classifySources,
+  summarizeTrust,
+  TRUST_LABEL,
+  TRUST_BADGE_CLASS,
+} from "../../lib/source-trust";
+import { extractChapters, isFictionLike } from "../../lib/chapters";
+import type { ChapterNote } from "../../lib/database.types";
 
 const { id } = Astro.params;
 
@@ -39,6 +47,8 @@ const analysis = analyses?.[0];
 const similarBooks = (analysis?.similar_books ?? []) as SimilarBook[];
 const readingCost = analysis?.reading_cost as ReadingCost | null;
 const rawSources = (analysis?.raw_sources ?? []) as RawSource[];
+const trustedSources = classifySources(rawSources);
+const trust = summarizeTrust(trustedSources);
 
 const sourceTypeLabel: Record<RawSource["type"], string> = {
   naver_blog: "네이버 블로그",
@@ -52,18 +62,32 @@ const sourceTypeLabel: Record<RawSource["type"], string> = {
 const user = Astro.locals.user;
 let pickStatus: PickStatus | null = null;
 let pickNote: string = "";
+let noteBefore: string = "";
+let noteAfter: string = "";
+let chapterNotes: Record<string, ChapterNote> = {};
 if (user) {
   const { data: pick } = await Astro.locals.supabase
     .from("user_picks")
-    .select("status, personal_note")
+    .select("status, personal_note, note_before, note_after, chapter_notes")
     .eq("user_id", user.id)
     .eq("book_id", id)
-    .maybeSingle<{ status: PickStatus; personal_note: string | null }>();
+    .maybeSingle<{
+      status: PickStatus;
+      personal_note: string | null;
+      note_before: string | null;
+      note_after: string | null;
+      chapter_notes: Record<string, ChapterNote> | null;
+    }>();
   if (pick) {
     pickStatus = pick.status;
     pickNote = pick.personal_note ?? "";
+    noteBefore = pick.note_before ?? "";
+    noteAfter = pick.note_after ?? "";
+    chapterNotes = pick.chapter_notes ?? {};
   }
 }
+
+const chapters = isFictionLike(book.category) ? extractChapters(book.toc) : [];
 
 const pickLabels: Record<PickStatus, string> = {
   wishlist: "위시리스트",
@@ -145,6 +169,14 @@ const pickOrder: PickStatus[] = ["wishlist", "reading", "read"];
             </p>
           )
         }
+        {
+          book.added_context && (
+            <p class="pt-2 text-sm text-neutral-500">
+              <span class="font-medium text-neutral-700">등록 메모: </span>
+              {book.added_context}
+            </p>
+          )
+        }
       </div>
     </header>
 
@@ -174,20 +206,46 @@ const pickOrder: PickStatus[] = ["wishlist", "reading", "read"];
             </fieldset>
             <div>
               <label
-                for="personal_note"
+                for="note_before"
                 class="block text-sm font-medium text-neutral-700"
               >
-                개인 메모
+                읽기 전: 끌린 이유 / 기대
               </label>
               <textarea
-                name="personal_note"
-                id="personal_note"
+                name="note_before"
+                id="note_before"
                 rows="2"
                 class="mt-1 block w-full rounded border border-neutral-300 px-3 py-2 text-sm"
-                placeholder="이 책에 대한 개인 메모"
-                set:html={pickNote}
+                placeholder="이 책에 끌린 이유, 읽기 전의 기대"
+                set:html={noteBefore}
               />
             </div>
+            <div>
+              <label
+                for="note_after"
+                class="block text-sm font-medium text-neutral-700"
+              >
+                읽고 난 후: 변화
+              </label>
+              <textarea
+                name="note_after"
+                id="note_after"
+                rows="2"
+                class="mt-1 block w-full rounded border border-neutral-300 px-3 py-2 text-sm"
+                placeholder="읽기 전 X에 대한 내 생각이 후 Y로 변했다 — 식의 회고"
+                set:html={noteAfter}
+              />
+            </div>
+            <details class="text-sm text-neutral-500">
+              <summary class="cursor-pointer">기타 메모</summary>
+              <textarea
+                name="personal_note"
+                rows="2"
+                class="mt-2 block w-full rounded border border-neutral-300 px-3 py-2 text-sm"
+                placeholder="자유 메모 (legacy)"
+                set:html={pickNote}
+              />
+            </details>
             <div class="flex items-center gap-3">
               <button
                 type="submit"
@@ -206,6 +264,54 @@ const pickOrder: PickStatus[] = ["wishlist", "reading", "read"];
               )}
             </div>
           </form>
+
+          {chapters.length > 0 && (
+            <details class="mt-5 border-t border-neutral-200 pt-4">
+              <summary class="cursor-pointer text-sm font-medium text-neutral-700">
+                단편/장 별 메모 ({chapters.length}편) — {book.category} 분야
+                자동 활성화
+              </summary>
+              <form
+                method="POST"
+                action="/api/picks/chapters"
+                class="mt-3 space-y-2"
+              >
+                <input type="hidden" name="book_id" value={book.id} />
+                <input type="hidden" name="next" value={`/books/${book.id}`} />
+                <ul class="space-y-2">
+                  {chapters.map((title) => {
+                    const cn = chapterNotes[title];
+                    return (
+                      <li class="grid grid-cols-[auto_1fr] items-center gap-2 rounded border border-neutral-200 bg-neutral-50 p-2 text-sm">
+                        <label class="flex cursor-pointer items-center gap-2">
+                          <input
+                            type="checkbox"
+                            name={`chapter[${title}][read]`}
+                            checked={cn?.read ?? false}
+                          />
+                          <span class="font-medium">{title}</span>
+                        </label>
+                        <input
+                          type="text"
+                          name={`chapter[${title}][note]`}
+                          value={cn?.note ?? ""}
+                          maxlength="500"
+                          placeholder="이 편에 대한 한 줄 메모"
+                          class="rounded border border-neutral-300 px-2 py-1 text-sm"
+                        />
+                      </li>
+                    );
+                  })}
+                </ul>
+                <button
+                  type="submit"
+                  class="rounded bg-neutral-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-neutral-700"
+                >
+                  단편 메모 저장
+                </button>
+              </form>
+            </details>
+          )}
         </section>
       ) : (
         <p class="text-sm text-neutral-500">
@@ -311,13 +417,52 @@ const pickOrder: PickStatus[] = ["wishlist", "reading", "read"];
 
           {rawSources.length > 0 && (
             <section>
-              <h2 class="text-lg font-semibold">출처 ({rawSources.length})</h2>
+              <div class="flex flex-wrap items-baseline justify-between gap-2">
+                <h2 class="text-lg font-semibold">
+                  출처 ({rawSources.length})
+                </h2>
+                <div class="flex flex-wrap gap-1.5 text-xs">
+                  {trust.independent > 0 && (
+                    <span class="rounded bg-emerald-100 px-2 py-0.5 text-emerald-800">
+                      독립 {trust.independent}
+                    </span>
+                  )}
+                  {trust.sponsored > 0 && (
+                    <span class="rounded bg-amber-100 px-2 py-0.5 text-amber-800">
+                      협찬 {trust.sponsored}
+                    </span>
+                  )}
+                  {trust.promotional > 0 && (
+                    <span class="rounded bg-orange-100 px-2 py-0.5 text-orange-800">
+                      마케팅 {trust.promotional}
+                    </span>
+                  )}
+                  {trust.meta > 0 && (
+                    <span class="rounded bg-neutral-100 px-2 py-0.5 text-neutral-600">
+                      메타 {trust.meta}
+                    </span>
+                  )}
+                </div>
+              </div>
+              {trust.independent + trust.sponsored + trust.promotional > 0 && (
+                <p class="mt-1 text-xs text-neutral-500">
+                  독자 후기 중 독립 후기{" "}
+                  {Math.round(trust.independentRatio * 100)}% — 다른 도서
+                  서비스가 잘 보여주지 않는 정보입니다.
+                </p>
+              )}
               <ul class="mt-3 space-y-2 text-sm">
-                {rawSources.map((src) => (
+                {trustedSources.map((src) => (
                   <li class="rounded border border-neutral-200 bg-white p-3">
-                    <div class="flex items-center gap-2">
+                    <div class="flex flex-wrap items-center gap-2">
                       <span class="rounded bg-neutral-100 px-1.5 py-0.5 text-xs text-neutral-600">
                         {sourceTypeLabel[src.type] ?? src.type}
+                      </span>
+                      <span
+                        class={`rounded px-1.5 py-0.5 text-xs ${TRUST_BADGE_CLASS[src.trust]}`}
+                        title={src.trustReason ?? undefined}
+                      >
+                        {TRUST_LABEL[src.trust]}
                       </span>
                       <a
                         href={src.url}

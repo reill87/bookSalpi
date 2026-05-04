@@ -17,6 +17,8 @@ export const POST: APIRoute = async ({ request, locals, redirect }) => {
   const bookId = String(form.get("book_id") ?? "");
   const statusRaw = String(form.get("status") ?? "");
   const personalNote = String(form.get("personal_note") ?? "").trim() || null;
+  const noteBefore = String(form.get("note_before") ?? "").trim() || null;
+  const noteAfter = String(form.get("note_after") ?? "").trim() || null;
   const next = String(form.get("next") ?? `/books/${bookId}`) || "/";
 
   if (!bookId || !VALID.includes(statusRaw as PickStatus)) {
@@ -32,6 +34,8 @@ export const POST: APIRoute = async ({ request, locals, redirect }) => {
       book_id: bookId,
       status: statusRaw as PickStatus,
       personal_note: personalNote,
+      note_before: noteBefore,
+      note_after: noteAfter,
     } as never,
     { onConflict: "user_id,book_id" },
   );

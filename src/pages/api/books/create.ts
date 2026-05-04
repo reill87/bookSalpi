@@ -19,6 +19,10 @@ export const POST: APIRoute = async ({ request, redirect, locals }) => {
   const form = await request.formData();
   const inputRaw = String(form.get("input") ?? "").trim();
   const category = String(form.get("category") ?? "").trim() || null;
+  const addedContext =
+    String(form.get("added_context") ?? "")
+      .trim()
+      .slice(0, 200) || null;
 
   if (!inputRaw) {
     return new Response(
@@ -73,6 +77,7 @@ export const POST: APIRoute = async ({ request, redirect, locals }) => {
       category,
       status: "pending",
       added_by: locals.user.id,
+      added_context: addedContext,
     } as never)
     .select("id")
     .single<{ id: string }>();

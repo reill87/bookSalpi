@@ -51,6 +51,27 @@ import BaseLayout from "../../layouts/BaseLayout.astro";
         />
       </div>
 
+      <div>
+        <label
+          for="added_context"
+          class="block text-sm font-medium text-neutral-700"
+        >
+          왜 끌렸는지 (선택)
+        </label>
+        <input
+          type="text"
+          id="added_context"
+          name="added_context"
+          maxlength="200"
+          placeholder="예: 트위터에서 @username 추천 / 교보 신간 코너 / 친구 K가 빌려줬다"
+          class="mt-1 block w-full rounded border border-neutral-300 px-3 py-2 text-sm focus:border-neutral-500 focus:outline-none"
+        />
+        <p class="mt-1 text-xs text-neutral-500">
+          시간이 쌓이면 본인 독서 패턴이 보입니다 (예: "내가 산 책의 60%는
+          인스타 출처").
+        </p>
+      </div>
+
       <div class="flex items-center gap-3">
         <button
           type="submit"

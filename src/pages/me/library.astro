@@ -1,6 +1,6 @@
 ---
 import BaseLayout from "../../layouts/BaseLayout.astro";
-import type { PickStatus, Book } from "../../lib/database.types";
+import type { PickStatus, Book, ReadingCost } from "../../lib/database.types";
 
 // 미들웨어가 이미 미인증 사용자를 /login으로 보냅니다.
 const user = Astro.locals.user!;
@@ -8,18 +8,28 @@ const user = Astro.locals.user!;
 interface PickRow {
   status: PickStatus;
   personal_note: string | null;
+  note_before: string | null;
+  note_after: string | null;
   added_at: string;
   updated_at: string;
   book: Pick<
     Book,
-    "id" | "title" | "author" | "category" | "cover_url" | "status"
-  >;
+    | "id"
+    | "title"
+    | "author"
+    | "category"
+    | "cover_url"
+    | "status"
+    | "added_context"
+  > & {
+    analyses?: { reading_cost: ReadingCost | null }[] | null;
+  };
 }
 
 const { data, error } = await Astro.locals.supabase
   .from("user_picks")
   .select(
-    "status, personal_note, added_at, updated_at, book:book_id(id, title, author, category, cover_url, status)",
+    "status, personal_note, note_before, note_after, added_at, updated_at, book:book_id(id, title, author, category, cover_url, status, added_context, analyses(reading_cost))",
   )
   .eq("user_id", user.id)
   .order("updated_at", { ascending: false })
@@ -42,6 +52,66 @@ const labels: Record<PickStatus, string> = {
   read: "완독",
 };
 const order: PickStatus[] = ["reading", "wishlist", "read"];
+
+// === 통계 계산 ===
+const categoryCounts = new Map<string, number>();
+let totalPages = 0;
+let pagesCount = 0;
+let totalHours = 0;
+let hoursCount = 0;
+const sourceKeywords = new Map<string, number>();
+const SOURCE_PATTERNS: Array<{ key: string; re: RegExp }> = [
+  { key: "트위터/X", re: /(트위터|twitter|\bx\b)/i },
+  { key: "인스타", re: /(인스타|instagram)/i },
+  { key: "유튜브", re: /(유튜브|youtube)/i },
+  { key: "사람 추천", re: /(추천|친구|지인|소개|얘기|선물)/ },
+  { key: "서점·신간", re: /(서점|신간|베스트|매대|코너|교보|알라딘|yes24)/ },
+  { key: "검색", re: /(검색|찾다가)/ },
+  { key: "뉴스레터·블로그", re: /(뉴스레터|블로그|미디엄|아티클)/ },
+];
+
+for (const p of picks) {
+  if (p.book.category) {
+    categoryCounts.set(
+      p.book.category,
+      (categoryCounts.get(p.book.category) ?? 0) + 1,
+    );
+  }
+  const cost = p.book.analyses?.[0]?.reading_cost;
+  if (cost?.pages) {
+    totalPages += cost.pages;
+    pagesCount++;
+  }
+  if (cost?.est_hours) {
+    totalHours += cost.est_hours;
+    hoursCount++;
+  }
+  if (p.book.added_context) {
+    let matched = false;
+    for (const { key, re } of SOURCE_PATTERNS) {
+      if (re.test(p.book.added_context)) {
+        sourceKeywords.set(key, (sourceKeywords.get(key) ?? 0) + 1);
+        matched = true;
+      }
+    }
+    if (!matched) {
+      sourceKeywords.set("기타", (sourceKeywords.get("기타") ?? 0) + 1);
+    }
+  }
+}
+
+const topCategories = Array.from(categoryCounts.entries())
+  .sort(([, a], [, b]) => b - a)
+  .slice(0, 5);
+const totalCatCount = topCategories.reduce((s, [, c]) => s + c, 0);
+const sourceList = Array.from(sourceKeywords.entries()).sort(
+  ([, a], [, b]) => b - a,
+);
+const totalSourceCount = sourceList.reduce((s, [, c]) => s + c, 0);
+const avgPages = pagesCount > 0 ? Math.round(totalPages / pagesCount) : null;
+const avgHours = hoursCount > 0 ? Math.round(totalHours / hoursCount) : null;
+const completionRate =
+  picks.length > 0 ? Math.round((groups.read.length / picks.length) * 100) : 0;
 ---
 
 <BaseLayout title="내 책장 — 책살피">
@@ -52,6 +122,96 @@ const order: PickStatus[] = ["reading", "wishlist", "read"];
         {user.email} · 총 {picks.length}권
       </p>
     </header>
+
+    {
+      picks.length > 0 && (
+        <section class="rounded-lg border border-neutral-200 bg-white p-5">
+          <h2 class="text-sm font-medium text-neutral-500">독서 패턴</h2>
+          <div class="mt-3 grid grid-cols-2 gap-x-4 gap-y-3 sm:grid-cols-4">
+            <div>
+              <dt class="text-xs text-neutral-500">완독률</dt>
+              <dd class="text-lg font-semibold">
+                {completionRate}%{" "}
+                <span class="text-xs font-normal text-neutral-500">
+                  ({groups.read.length}/{picks.length})
+                </span>
+              </dd>
+            </div>
+            <div>
+              <dt class="text-xs text-neutral-500">평균 분량</dt>
+              <dd class="text-lg font-semibold">
+                {avgPages != null ? `${avgPages}쪽` : "—"}
+              </dd>
+            </div>
+            <div>
+              <dt class="text-xs text-neutral-500">평균 예상 시간</dt>
+              <dd class="text-lg font-semibold">
+                {avgHours != null ? `${avgHours}시간` : "—"}
+              </dd>
+            </div>
+            <div>
+              <dt class="text-xs text-neutral-500">읽는 중</dt>
+              <dd class="text-lg font-semibold">{groups.reading.length}권</dd>
+            </div>
+          </div>
+
+          {topCategories.length > 0 && (
+            <div class="mt-5">
+              <dt class="text-xs text-neutral-500">분야 비중</dt>
+              <dd class="mt-1 space-y-1.5">
+                {topCategories.map(([cat, n]) => {
+                  const pct =
+                    totalCatCount > 0
+                      ? Math.round((n / totalCatCount) * 100)
+                      : 0;
+                  return (
+                    <div class="flex items-center gap-2 text-sm">
+                      <span class="w-20 shrink-0 truncate text-neutral-700">
+                        {cat}
+                      </span>
+                      <div class="h-2 flex-1 overflow-hidden rounded bg-neutral-100">
+                        <div
+                          class="h-full bg-neutral-700"
+                          style={`width: ${pct}%`}
+                        />
+                      </div>
+                      <span class="w-16 shrink-0 text-right text-xs text-neutral-500">
+                        {n}권 · {pct}%
+                      </span>
+                    </div>
+                  );
+                })}
+              </dd>
+            </div>
+          )}
+
+          {sourceList.length > 0 && (
+            <div class="mt-5">
+              <dt class="text-xs text-neutral-500">
+                등록 출처 (등록 메모 키워드 분석)
+              </dt>
+              <dd class="mt-1 flex flex-wrap gap-1.5 text-xs">
+                {sourceList.map(([key, n]) => {
+                  const pct =
+                    totalSourceCount > 0
+                      ? Math.round((n / totalSourceCount) * 100)
+                      : 0;
+                  return (
+                    <span class="rounded bg-neutral-100 px-2 py-0.5 text-neutral-700">
+                      {key} {n}권 ({pct}%)
+                    </span>
+                  );
+                })}
+              </dd>
+              <p class="mt-2 text-xs text-neutral-500">
+                책 등록 시 "왜 끌렸는지" 메모를 적으면 자동 분류됩니다. 메모
+                없는 책은 집계되지 않아요.
+              </p>
+            </div>
+          )}
+        </section>
+      )
+    }
 
     {
       picks.length === 0 ? (
@@ -92,7 +252,23 @@ const order: PickStatus[] = ["reading", "wishlist", "read"];
                             {p.book.author}
                           </div>
                         )}
-                        {p.personal_note && (
+                        {p.note_before && (
+                          <p class="mt-1 line-clamp-2 text-xs text-neutral-500">
+                            <span class="font-medium text-neutral-700">
+                              전:{" "}
+                            </span>
+                            {p.note_before}
+                          </p>
+                        )}
+                        {p.note_after && (
+                          <p class="mt-0.5 line-clamp-2 text-xs text-neutral-500">
+                            <span class="font-medium text-neutral-700">
+                              후:{" "}
+                            </span>
+                            {p.note_after}
+                          </p>
+                        )}
+                        {!p.note_before && !p.note_after && p.personal_note && (
                           <p class="mt-1 line-clamp-2 text-xs text-neutral-500">
                             {p.personal_note}
                           </p>
