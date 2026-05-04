@@ -15,6 +15,24 @@ export interface SourceWithTrust extends RawSource {
   trustReason?: string;
 }
 
+// summary 안의 부정형 표현(예: "협찬 표시 없음", "체험단 아님")을 먼저 제거한 뒤
+// 패턴 매칭. 이렇게 안 하면 워커가 협찬 검증 결과를 "표시 없음"으로 기록한
+// 케이스를 협찬으로 오분류함.
+const NEGATION_REMOVAL = [
+  /협찬\s*표시\s*없음/g,
+  /협찬\s*명시\s*없음/g,
+  /협찬\s*없음/g,
+  /체험단\s*아님/g,
+  /비협찬/g,
+  /협찬이?\s*아닌/g,
+];
+
+function stripNegations(text: string): string {
+  let out = text;
+  for (const re of NEGATION_REMOVAL) out = out.replace(re, "");
+  return out;
+}
+
 const SPONSORED_PATTERNS: Array<{ re: RegExp; reason: string }> = [
   { re: /무료로?\s*제공받아/, reason: "출판사 협찬 명시" },
   { re: /협찬/, reason: "협찬 명시" },
@@ -47,13 +65,14 @@ export function classifyTrust(source: RawSource): SourceWithTrust {
     return { ...source, trust: "meta" };
   }
 
+  const cleaned = stripNegations(source.summary);
   for (const { re, reason } of SPONSORED_PATTERNS) {
-    if (re.test(source.summary)) {
+    if (re.test(cleaned)) {
       return { ...source, trust: "sponsored", trustReason: reason };
     }
   }
   for (const { re, reason } of PROMOTIONAL_PATTERNS) {
-    if (re.test(source.summary)) {
+    if (re.test(cleaned)) {
       return { ...source, trust: "promotional", trustReason: reason };
     }
   }
